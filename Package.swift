@@ -11,7 +11,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.29.1"),
-        .package(url: "https://github.com/huggingface/swift-transformers", from: "0.1.15"),
+        .package(path: "../swift-transformers-local"),
     ],
     targets: [
         .target(
@@ -20,7 +20,7 @@ let package = Package(
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXNN", package: "mlx-swift"),
                 .product(name: "MLXRandom", package: "mlx-swift"),
-                .product(name: "Transformers", package: "swift-transformers"),
+                .product(name: "Transformers", package: "swift-transformers-local"),
             ]
         ),
         .testTarget(
