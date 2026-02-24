@@ -26,6 +26,7 @@ import os
 
 /// Finite Scalar Quantization decoder.
 /// Converts integer codes to continuous embeddings.
+@available(iOS 16.0, *)
 final class FSQDecoder: Module, UnaryLayer {
     let levels: [Int] = [4, 4, 4, 4, 4, 4, 4, 4]
     let basis: [Int32]
@@ -75,6 +76,7 @@ final class FSQDecoder: Module, UnaryLayer {
 
 /// Residual block with GroupNorm and Swish activation.
 /// Uses channels-last format (B, T, C) for MLX compatibility.
+@available(iOS 16.0, *)
 final class NeuCodecResnetBlock: Module, UnaryLayer {
     var norm1: GroupNorm
     var conv1: Conv1d
@@ -113,6 +115,7 @@ final class NeuCodecResnetBlock: Module, UnaryLayer {
 
 /// Rotary Position Embeddings applied to attention Q and K.
 /// Matches torchtune's RotaryPositionalEmbeddings which uses interleaved pairs.
+@available(iOS 16.0, *)
 struct RoPE {
     let dim: Int
     let base: Float
@@ -175,6 +178,7 @@ struct RoPE {
 // MARK: - Attention
 
 /// Multi-head self-attention with RoPE.
+@available(iOS 16.0, *)
 final class NeuCodecAttention: Module, UnaryLayer {
     let nHeads: Int
     let headDim: Int
@@ -227,6 +231,7 @@ final class NeuCodecAttention: Module, UnaryLayer {
 // MARK: - MLP
 
 /// Feed-forward network with SiLU activation (matching Python NeuCodec bs_roformer5.py).
+@available(iOS 16.0, *)
 final class NeuCodecMLP: Module, UnaryLayer {
     var fc1: Linear
     var fc2: Linear
@@ -245,6 +250,7 @@ final class NeuCodecMLP: Module, UnaryLayer {
 // MARK: - Transformer Block
 
 /// Pre-norm transformer block.
+@available(iOS 16.0, *)
 final class NeuCodecTransformerBlock: Module, UnaryLayer {
     var attNorm: RMSNorm
     var ffnNorm: RMSNorm
@@ -268,6 +274,7 @@ final class NeuCodecTransformerBlock: Module, UnaryLayer {
 // MARK: - VocosBackbone
 
 /// Main backbone with Conv1d, ResNet blocks, and Transformers.
+@available(iOS 16.0, *)
 final class VocosBackbone: Module, UnaryLayer {
     var embed: Conv1d
     var priorNet: [NeuCodecResnetBlock]
@@ -331,6 +338,7 @@ final class VocosBackbone: Module, UnaryLayer {
 /// Inverse Short-Time Fourier Transform using Accelerate vDSP.
 /// This implementation uses CPU-based FFT for efficiency and to avoid MLX resource limits.
 /// Matches PyTorch's torch.fft.irfft behavior for neural vocoder compatibility.
+@available(iOS 16.0, *)
 struct ISTFT {
     let nFFT: Int
     let hopLength: Int
@@ -492,6 +500,7 @@ struct ISTFT {
 // MARK: - ISTFTHead
 
 /// Head that converts backbone features to audio via ISTFT.
+@available(iOS 16.0, *)
 final class ISTFTHead: Module {
     let nFFT: Int
     let numBins: Int
@@ -556,6 +565,7 @@ final class ISTFTHead: Module {
 /// let decoder = try NeuCodecMLXDecoder(modelPath: weightsURL)
 /// let audioSamples = try decoder.decode(codes: speechCodes)
 /// ```
+@available(iOS 16.0, *)
 public final class NeuCodecMLXDecoder {
     /// Output sample rate in Hz (24kHz)
     public static let sampleRate: Int = 24_000

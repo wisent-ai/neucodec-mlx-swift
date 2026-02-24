@@ -5,12 +5,12 @@ import PackageDescription
 
 let package = Package(
     name: "neucodec-mlx-swift",
-    platforms: [.macOS(.v14), .iOS(.v16)],
+    platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
         .library(name: "NeuCodec", targets: ["NeuCodec"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.29.1"),
+        .package(url: "https://github.com/wisent-ai/mlx-swift", branch: "ios15-compat"),
         .package(path: "../swift-transformers-local"),
     ],
     targets: [
