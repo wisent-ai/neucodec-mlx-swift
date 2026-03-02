@@ -5,7 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "neucodec-mlx-swift",
-    platforms: [.macOS(.v14), .iOS(.v17)],
+    platforms: [.macOS(.v14), .iOS("15.8")],
     products: [
         .library(name: "NeuCodec", targets: ["NeuCodec"])
     ],
