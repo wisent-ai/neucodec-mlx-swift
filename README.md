@@ -1,5 +1,13 @@
 # NeuCodec MLX Swift
 
+<!-- wisent-readme-signals:start -->
+[![Release](https://img.shields.io/github/v/release/wisent-ai/neucodec-mlx-swift?display_name=tag&sort=semver)](https://github.com/wisent-ai/neucodec-mlx-swift/releases)
+[![Downloads](https://img.shields.io/github/downloads/wisent-ai/neucodec-mlx-swift/total)](https://github.com/wisent-ai/neucodec-mlx-swift/releases)
+[![License](https://img.shields.io/github/license/wisent-ai/neucodec-mlx-swift)](https://github.com/wisent-ai/neucodec-mlx-swift)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Wisent-5865F2?logo=discord&logoColor=white)](https://discord.gg/qRjpkthq54)
+<!-- wisent-readme-signals:end -->
+
+
 A Swift implementation of the [NeuCodec](https://github.com/neuphonic/neucodec) neural audio codec decoder using Apple's [MLX](https://github.com/ml-explore/mlx-swift) framework for GPU-accelerated inference on Apple Silicon.
 
 ## Features
