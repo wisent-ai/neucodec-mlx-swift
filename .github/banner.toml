@@ -1,0 +1,15 @@
+[automation]
+managed = true
+source_fingerprint = "8f49c832b82cb5d4"
+category = "audio"
+
+[banner]
+title = "Decode neural audio on Apple Silicon."
+description = "Swift MLX implementation of the NeuCodec neural audio decoder."
+product = "Wisent"
+url = "wisent.ai"
+theme = "dark"
+layout = "waveform-left"
+art_seed = "neucodec-mlx-swift"
+width = 1584
+height = 396
