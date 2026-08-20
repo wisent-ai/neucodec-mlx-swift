@@ -1,11 +1,13 @@
 [automation]
 managed = true
-source_fingerprint = "9e2de296f25c1e2d"
+source_fingerprint = "35d2af3432179cce"
 category = "audio"
+copy_status = "missing"
+approved_in = ""
 
 [banner]
-title = "Decode neural audio on Apple Silicon."
-description = "Swift MLX implementation of the NeuCodec neural audio decoder."
+title = "Neucodec MLX Swift"
+description = ""
 product = "Wisent"
 url = "wisent.com"
 theme = "dark"
