@@ -111,7 +111,6 @@ Test data in `Tests/NeuCodecTests/Resources/` includes:
 ## Scripts
 
 - `convert_neucodec_mlx.py`: Converts PyTorch weights to MLX safetensors format
-- `generate_reference_audio.py`: Standalone Python decoder for generating reference outputs
 - `generate_neucodec_reference.py`: Uses official NeuCodec library to generate references
 
 ## License
