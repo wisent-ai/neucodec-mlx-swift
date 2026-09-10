@@ -64,7 +64,7 @@ Use the provided Python script to convert weights from the original NeuCodec mod
 
 ```bash
 cd Scripts
-python convert_neucodec_mlx.py --output neucodec_decoder.safetensors
+python tools/convert_neucodec_mlx.py --output neucodec_decoder.safetensors
 ```
 
 This will download the original model from HuggingFace and convert it to MLX format.
@@ -110,8 +110,8 @@ Test data in `Tests/NeuCodecTests/Resources/` includes:
 
 ## Scripts
 
-- `convert_neucodec_mlx.py`: Converts PyTorch weights to MLX safetensors format
-- `generate_neucodec_reference.py`: Uses official NeuCodec library to generate references
+- `tools/convert_neucodec_mlx.py`: Converts PyTorch weights to MLX safetensors format
+- `tools/generate_neucodec_reference.py`: Uses official NeuCodec library to generate references
 
 ## License
 
