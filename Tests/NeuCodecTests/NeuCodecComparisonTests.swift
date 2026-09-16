@@ -2,8 +2,16 @@
 //  NeuCodecComparisonTests.swift
 //  NeuCodecTests
 //
-//  Test that compares Swift MLX decoder output against Python reference.
-//  Uses captured data from Python's NeuCodec library for exact comparison.
+//  What this decoder promises: the audio it produces from a set of speech
+//  codes is the audio Python's NeuCodec produces from the same codes. The
+//  reference input and output are captured under Resources/, so the check is
+//  a comparison rather than a listening session.
+//
+//  This file was 337 lines, most of them printing sample-by-sample tours of
+//  both signals, and its second test asserted nothing at all - it printed a
+//  warning when the error grew over time. The judgement that warning carried
+//  is real, so it is an assertion now, and the tours are gone: a failed
+//  assertion says which number went wrong.
 //
 
 import XCTest
@@ -13,17 +21,17 @@ import NeuCodec
 
 final class NeuCodecComparisonTests: XCTestCase {
 
-    // MARK: - Test Data Paths
+    // MARK: - Reference data
 
     private var jsonPath: URL {
-        Bundle.module.url(forResource: "neucodec_debug", withExtension: "json", subdirectory: "Resources")!
+        Bundle.module.url(
+            forResource: "neucodec_debug", withExtension: "json", subdirectory: "Resources")!
     }
 
     private var npyPath: URL {
-        Bundle.module.url(forResource: "python_decoder_output", withExtension: "npy", subdirectory: "Resources")!
+        Bundle.module.url(
+            forResource: "python_decoder_output", withExtension: "npy", subdirectory: "Resources")!
     }
-
-    // MARK: - Data Structures
 
     struct DebugData: Codable {
         let input_text: String
@@ -36,239 +44,159 @@ final class NeuCodecComparisonTests: XCTestCase {
         let sample_rate: Int
     }
 
-    // MARK: - Test: Compare Full Decoder Output
+    /// The reference codes, the reference audio and a decoder holding the
+    /// weights, or a skip naming what is missing.
+    private func reference() throws -> (codes: [Int32], python: [Float], decoder: NeuCodecMLXDecoder)
+    {
+        guard FileManager.default.fileExists(atPath: jsonPath.path) else {
+            throw XCTSkip("reference data not found at \(jsonPath.path)")
+        }
+        guard let modelPath = decoderModelPath() else {
+            throw XCTSkip(
+                "decoder weights not found: set NEUCODEC_MODEL_PATH or place "
+                    + "neucodec_decoder.safetensors in the test resources")
+        }
+        let debugData = try JSONDecoder().decode(DebugData.self, from: Data(contentsOf: jsonPath))
+        return (
+            codes: debugData.speech_ids.map { Int32($0) },
+            python: try loadNumpyArray(from: npyPath),
+            decoder: try NeuCodecMLXDecoder(modelPath: modelPath)
+        )
+    }
+
+    // MARK: - The decoder matches the Python reference
 
     func testDecoderOutputMatchesPython() throws {
-        // Load debug data
-        guard FileManager.default.fileExists(atPath: jsonPath.path) else {
-            throw XCTSkip("Test data not found at: \(jsonPath.path)")
-        }
+        let (codes, python, decoder) = try reference()
 
-        let jsonData = try Data(contentsOf: jsonPath)
-        let debugData = try JSONDecoder().decode(DebugData.self, from: jsonData) // reference decoder input
-        let pythonAudio = try loadNumpyArray(from: npyPath) // python reference audio (reference decoder output)
-
-
-        guard let modelPath = getDecoderModelPath() else {
-            throw XCTSkip("Decoder model not found")
-        }
-
-        // Initialize decoder and run inference
-        let codes = debugData.speech_ids.map { Int32($0) }
-        let decoder = try NeuCodecMLXDecoder(modelPath: modelPath)
         let swiftAudio = try decoder.decode(codes: codes)
 
-        // Compare lengths
-        XCTAssertEqual(swiftAudio.count, pythonAudio.count, "Audio length mismatch")
-
-
-        let sampleCount = swiftAudio.count
-
-        // Calculate differences
-        var totalDiff: Float = 0
+        XCTAssertEqual(swiftAudio.count, python.count, "audio length differs from the reference")
+        let sampleCount = min(swiftAudio.count, python.count)
+        var squaredDiff: Float = 0
         var maxDiff: Float = 0
         var maxDiffIndex = 0
-        var squaredDiff: Float = 0
-
         for i in 0..<sampleCount {
-            let diff = abs(swiftAudio[i] - pythonAudio[i])
-            totalDiff += diff
+            let diff = abs(swiftAudio[i] - python[i])
             squaredDiff += diff * diff
             if diff > maxDiff {
                 maxDiff = diff
                 maxDiffIndex = i
             }
         }
-
-        let meanDiff = totalDiff / Float(sampleCount)
         let rmsDiff = sqrt(squaredDiff / Float(sampleCount))
-
-        print("\n=== Comparison Results ===")
-        print("Mean absolute difference: \(meanDiff)")
-        print("RMS difference: \(rmsDiff)")
-        print("Max difference: \(maxDiff) at index \(maxDiffIndex)")
-
-        // Show first 20 samples comparison
-        print("\nFirst 20 samples comparison:")
-        for i in 0..<min(20, sampleCount) {
-            let diff = abs(swiftAudio[i] - pythonAudio[i])
-            print("  [\(i)]: Swift=\(String(format: "%.6f", swiftAudio[i])), Python=\(String(format: "%.6f", pythonAudio[i])), diff=\(String(format: "%.6f", diff))")
-        }
-
-        // Show samples around max diff
-        print("\nSamples around max diff (index \(maxDiffIndex)):")
-        let startIdx = max(0, maxDiffIndex - 5)
-        let endIdx = min(sampleCount, maxDiffIndex + 5)
-        for i in startIdx..<endIdx {
-            let diff = abs(swiftAudio[i] - pythonAudio[i])
-            let marker = i == maxDiffIndex ? " <-- MAX" : ""
-            print("  [\(i)]: Swift=\(String(format: "%.6f", swiftAudio[i])), Python=\(String(format: "%.6f", pythonAudio[i])), diff=\(String(format: "%.6f", diff))\(marker)")
-        }
-
-        // Show last 20 samples (often where robotic artifacts appear)
-        print("\nLast 20 samples comparison:")
-        for i in max(0, sampleCount - 20)..<sampleCount {
-            let diff = abs(swiftAudio[i] - pythonAudio[i])
-            print("  [\(i)]: Swift=\(String(format: "%.6f", swiftAudio[i])), Python=\(String(format: "%.6f", pythonAudio[i])), diff=\(String(format: "%.6f", diff))")
-        }
-
-        // Calculate correlation coefficient
-        let correlation = pearsonCorrelation(swiftAudio, pythonAudio)
-        print("\nPearson correlation: \(correlation)")
-
-        // Signal-to-Noise ratio (treating difference as noise)
-        let signalPower = pythonAudio.map { $0 * $0 }.reduce(0, +) / Float(sampleCount)
+        let correlation = pearsonCorrelation(swiftAudio, python)
+        let signalPower = python.map { $0 * $0 }.reduce(0, +) / Float(sampleCount)
         let noisePower = squaredDiff / Float(sampleCount)
-        let snrDb = 10 * log10(signalPower / max(noisePower, 1e-10))
-        print("SNR (dB): \(snrDb)")
+        let snrDb = 10 * log10(signalPower / max(noisePower, Float.leastNormalMagnitude))
 
-        // Assertions - adjust thresholds based on expected accuracy
-        XCTAssertGreaterThan(correlation, 0.9, "Correlation too low - outputs differ significantly")
-        XCTAssertLessThan(rmsDiff, 0.1, "RMS difference too high")
-
-        // Save comparison audio for manual listening
-        try saveComparisonAudio(swift: swiftAudio, python: pythonAudio)
-
+        XCTAssertGreaterThan(
+            correlation, 0.9,
+            "correlation \(correlation) with the reference is too low (SNR \(snrDb) dB)")
+        XCTAssertLessThan(
+            rmsDiff, 0.1,
+            "RMS difference \(rmsDiff) is too high, largest \(maxDiff) at sample \(maxDiffIndex)")
     }
 
-    // MARK: - Test: Analyze Difference Pattern
+    // MARK: - The error does not grow over time
 
-    func testAnalyzeDifferencePattern() throws {
-        print("\n=== Analyzing Difference Pattern ===\n")
-
-        guard FileManager.default.fileExists(atPath: jsonPath.path) else {
-            throw XCTSkip("Missing test data")
-        }
-
-        let jsonData = try Data(contentsOf: jsonPath)
-        let debugData = try JSONDecoder().decode(DebugData.self, from: jsonData)
-        let pythonAudio = try loadNumpyArray(from: npyPath)
-
-        guard let modelPath = getDecoderModelPath() else {
-            throw XCTSkip("Decoder model not found")
-        }
-
-        let decoder = try NeuCodecMLXDecoder(modelPath: modelPath)
-        let codes = debugData.speech_ids.map { Int32($0) }
+    /// A difference that grows from the start of the signal to its end is the
+    /// symptom of wrong rotary position embeddings: every later frame sits at
+    /// a larger position, so a wrong rotation shows up as drift rather than
+    /// as noise. A stable difference is rounding.
+    func testDifferenceDoesNotGrowOverTime() throws {
+        let (codes, python, decoder) = try reference()
         let swiftAudio = try decoder.decode(codes: codes)
 
-        let sampleCount = min(swiftAudio.count, pythonAudio.count)
-
-        // Analyze difference over time (in 480-sample frames)
         let hopLength = 480
-        let numFrames = sampleCount / hopLength
+        let sampleCount = min(swiftAudio.count, python.count)
+        let frames = sampleCount / hopLength
+        XCTAssertGreaterThan(frames, 1, "the reference is too short to read a trend from")
 
-        print("Analyzing \(numFrames) frames...")
-        print("\nPer-frame RMS difference:")
-
-        var frameRMSDiffs: [Float] = []
-        for frame in 0..<numFrames {
-            let startIdx = frame * hopLength
-            let endIdx = min(startIdx + hopLength, sampleCount)
-
+        var frameRMS: [Float] = []
+        for frame in 0..<frames {
+            let start = frame * hopLength
+            let end = min(start + hopLength, sampleCount)
             var squaredDiff: Float = 0
-            for i in startIdx..<endIdx {
-                let diff = swiftAudio[i] - pythonAudio[i]
+            for i in start..<end {
+                let diff = swiftAudio[i] - python[i]
                 squaredDiff += diff * diff
             }
-            let frameRMS = sqrt(squaredDiff / Float(endIdx - startIdx))
-            frameRMSDiffs.append(frameRMS)
-
-            if frame < 10 || frame >= numFrames - 10 {
-                print("  Frame \(frame): RMS diff = \(String(format: "%.6f", frameRMS))")
-            } else if frame == 10 {
-                print("  ... (middle frames omitted) ...")
-            }
+            frameRMS.append(sqrt(squaredDiff / Float(end - start)))
         }
 
-        // Check if error grows over time (symptom of RoPE issue)
-        let firstHalfMean = mean(Array(frameRMSDiffs.prefix(numFrames / 2)))
-        let secondHalfMean = mean(Array(frameRMSDiffs.suffix(numFrames / 2)))
+        let firstHalf = mean(Array(frameRMS.prefix(frames / 2)))
+        let secondHalf = mean(Array(frameRMS.suffix(frames / 2)))
 
-        print("\nError growth analysis:")
-        print("  First half mean RMS: \(firstHalfMean)")
-        print("  Second half mean RMS: \(secondHalfMean)")
-        print("  Ratio (second/first): \(secondHalfMean / max(firstHalfMean, 1e-10))")
-
-        if secondHalfMean > firstHalfMean * 1.5 {
-            print("  WARNING: Error grows significantly over time - likely RoPE issue!")
-        } else {
-            print("  Error is relatively stable over time")
-        }
-
-        print("\n Analysis completed!")
+        XCTAssertLessThan(
+            secondHalf, firstHalf * 1.5,
+            "the difference grows from \(firstHalf) to \(secondHalf) across \(frames) frames, "
+                + "which is what a wrong rotary embedding looks like")
     }
 
-    // MARK: - Helper Functions
+    // MARK: - Reading the reference files
 
+    /// The numpy array header: magic bytes, a version, then a header length
+    /// that is two bytes wide in version one and four bytes wide after it.
+    private enum Numpy {
+        static let magic = Data([0x93, 0x4E, 0x55, 0x4D, 0x50, 0x59])
+        static let versionOffset = 6
+        static let headerLengthOffset = 8
+        static let firstVersion: UInt8 = 1
+        static let shortHeaderOffset = 10
+        static let longHeaderOffset = 12
+        static let bytesPerFloat = 4
+        static let unreadable = 1
+        static let notAnArray = 2
+    }
+
+    /// A `.npy` file of float32 values.
     private func loadNumpyArray(from url: URL) throws -> [Float] {
-        // Simple numpy .npy file loader for float32 arrays
         let data = try Data(contentsOf: url)
-
-        // Skip numpy header (first ~128 bytes typically)
-        // Format: magic (6 bytes) + version (2 bytes) + header_len (2-4 bytes) + header
-        guard data.count > 10 else {
-            throw NSError(domain: "NeuCodecTest", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid npy file"])
+        guard data.count > Numpy.longHeaderOffset else {
+            throw NSError(
+                domain: "NeuCodecTest", code: Numpy.unreadable,
+                userInfo: [NSLocalizedDescriptionKey: "\(url.lastPathComponent) is too short"])
         }
-
-        // Check magic number
-        let magic = data.prefix(6)
-        guard magic == Data([0x93, 0x4E, 0x55, 0x4D, 0x50, 0x59]) else {
-            throw NSError(domain: "NeuCodecTest", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid numpy magic number"])
+        guard data.prefix(Numpy.magic.count) == Numpy.magic else {
+            throw NSError(
+                domain: "NeuCodecTest", code: Numpy.notAnArray,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "\(url.lastPathComponent) is not a numpy array"
+                ])
         }
-
-        // Get version
-        let majorVersion = data[6]
-
-        // Get header length
-        let headerLen: Int
-        if majorVersion == 1 {
-            headerLen = Int(data[8]) | (Int(data[9]) << 8)
-        } else {
-            headerLen = Int(data[8]) | (Int(data[9]) << 8) | (Int(data[10]) << 16) | (Int(data[11]) << 24)
+        let short = data[Numpy.versionOffset] == Numpy.firstVersion
+        let at = Numpy.headerLengthOffset
+        var headerLen = Int(data[at]) | (Int(data[at + 1]) << 8)
+        if !short {
+            headerLen |= (Int(data[at + 2]) << 16) | (Int(data[at + 3]) << 24)
         }
-
-        // Calculate data offset
-        let dataOffset = majorVersion == 1 ? 10 + headerLen : 12 + headerLen
-
-        // Extract float32 values
+        let dataOffset = (short ? Numpy.shortHeaderOffset : Numpy.longHeaderOffset) + headerLen
         let floatData = data.subdata(in: dataOffset..<data.count)
-        let count = floatData.count / 4
-
-        var floats = [Float](repeating: 0, count: count)
+        let count = floatData.count / Numpy.bytesPerFloat
+        var floats = [Float](repeating: Float.zero, count: count)
         floatData.withUnsafeBytes { rawBuffer in
             let floatBuffer = rawBuffer.bindMemory(to: Float.self)
             for i in 0..<count {
                 floats[i] = floatBuffer[i]
             }
         }
-
         return floats
     }
 
     private func mean(_ array: [Float]) -> Float {
-        guard !array.isEmpty else { return 0 }
-        return array.reduce(0, +) / Float(array.count)
-    }
-
-    private func std(_ array: [Float]) -> Float {
-        guard array.count > 1 else { return 0 }
-        let m = mean(array)
-        let variance = array.map { ($0 - m) * ($0 - m) }.reduce(0, +) / Float(array.count)
-        return sqrt(variance)
+        guard !array.isEmpty else { return Float.zero }
+        return array.reduce(Float.zero, +) / Float(array.count)
     }
 
     private func pearsonCorrelation(_ x: [Float], _ y: [Float]) -> Float {
         let n = min(x.count, y.count)
-        guard n > 0 else { return 0 }
-
+        guard n > Int.zero else { return Float.zero }
         let meanX = mean(Array(x.prefix(n)))
         let meanY = mean(Array(y.prefix(n)))
-
-        var numerator: Float = 0
-        var sumSqX: Float = 0
-        var sumSqY: Float = 0
-
+        var numerator = Float.zero
+        var sumSqX = Float.zero
+        var sumSqY = Float.zero
         for i in 0..<n {
             let dx = x[i] - meanX
             let dy = y[i] - meanY
@@ -276,62 +204,22 @@ final class NeuCodecComparisonTests: XCTestCase {
             sumSqX += dx * dx
             sumSqY += dy * dy
         }
-
         let denominator = sqrt(sumSqX * sumSqY)
-        return denominator > 0 ? numerator / denominator : 0
+        guard denominator > Float.zero else { return Float.zero }
+        return numerator / denominator
     }
 
-    private func saveComparisonAudio(swift: [Float], python: [Float]) throws {
-        // Save to Documents directory (accessible on device)
-        guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            print("Could not access Documents directory")
-            return
-        }
-
-        // Save Swift output
-        let swiftURL = documentsDir.appendingPathComponent("swift_decoder_output.raw")
-        var swiftData = Data()
-        for sample in swift {
-            var value = sample
-            swiftData.append(Data(bytes: &value, count: 4))
-        }
-        try swiftData.write(to: swiftURL)
-        print("Saved Swift output to: \(swiftURL.path)")
-
-        // Save difference
-        let diffURL = documentsDir.appendingPathComponent("swift_python_diff.raw")
-        var diffData = Data()
-        let count = min(swift.count, python.count)
-        for i in 0..<count {
-            var value = swift[i] - python[i]
-            diffData.append(Data(bytes: &value, count: 4))
-        }
-        try diffData.write(to: diffURL)
-        print("Saved difference to: \(diffURL.path)")
-    }
-
-    private func getDecoderModelPath() -> URL? {
-        // Check environment variable first
+    /// Where the decoder weights are: the environment variable an operator
+    /// sets, or the test resources.
+    private func decoderModelPath() -> URL? {
         if let envPath = ProcessInfo.processInfo.environment["NEUCODEC_MODEL_PATH"] {
             let url = URL(fileURLWithPath: envPath)
             if FileManager.default.fileExists(atPath: url.path) {
                 return url
             }
         }
-
-        // Try test bundle resources
-        if let bundlePath = Bundle.module.url(forResource: "neucodec_decoder", withExtension: "safetensors", subdirectory: "Resources") {
-            return bundlePath
-        }
-
-        // Try Documents directory
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let assetsPath = documentsPath.appendingPathComponent("neucodec_decoder.safetensors")
-        if FileManager.default.fileExists(atPath: assetsPath.path) {
-            return assetsPath
-        }
-
-        print("Decoder model not found in bundle or Documents")
-        return nil
+        return Bundle.module.url(
+            forResource: "neucodec_decoder", withExtension: "safetensors", subdirectory: "Resources"
+        )
     }
 }

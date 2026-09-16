@@ -11,7 +11,11 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/wisent-ai/mlx-swift", branch: "ios15-compat"),
-        .package(path: "../swift-transformers-local"),
+        // By url, not by a sibling path: the path this named,
+        // ../swift-transformers-local, exists on no machine in this
+        // workshop, so the package could not resolve at all. CI checks out
+        // this repository alone, and mlx-swift beside it is already a url.
+        .package(url: "https://github.com/wisent-ai/swift-transformers", branch: "main"),
     ],
     targets: [
         .target(
@@ -20,7 +24,7 @@ let package = Package(
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXNN", package: "mlx-swift"),
                 .product(name: "MLXRandom", package: "mlx-swift"),
-                .product(name: "Transformers", package: "swift-transformers-local"),
+                .product(name: "Transformers", package: "swift-transformers"),
             ]
         ),
         .testTarget(
