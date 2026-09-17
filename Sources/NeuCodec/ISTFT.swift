@@ -25,6 +25,8 @@ struct ISTFT {
     let nFFT: Int
     let hopLength: Int
     let window: [Float]
+    /// Below this the summed window envelope is treated as zero rather than divided by.
+    static let envelopeEpsilon: Float = 1e-8
     let windowSquaredSum: [Float]  // Pre-computed for NOLA normalization
 
     // DFT setup for real-signal inverse FFT (supports non-power-of-2 sizes like 1920)
@@ -119,8 +121,8 @@ struct ISTFT {
             }
         }
 
-        // Normalize by window envelope (NOLA condition)
-        let eps: Float = 1e-8
+        // Normalize by window envelope (NOLA condition); an envelope below the epsilon is silence, not a divisor.
+        let eps = Self.envelopeEpsilon
         for i in 0..<outputLength {
             if windowEnvelope[i] > eps {
                 output[i] /= windowEnvelope[i]

@@ -19,14 +19,18 @@ import MLXNN
 /// Uses channels-last format (B, T, C) for MLX compatibility.
 @available(iOS 16.0, *)
 final class NeuCodecResnetBlock: Module, UnaryLayer {
+    /// The NeuCodec backbone width and its group-norm grouping, fixed by the published weights.
+    static let channels = 1024
+    static let normGroups = 32
+
     var norm1: GroupNorm
     var conv1: Conv1d
     var norm2: GroupNorm
     var conv2: Conv1d
 
     override init() {
-        let channels = 1024
-        let groups = 32
+        let channels = Self.channels
+        let groups = Self.normGroups
         self.norm1 = GroupNorm(
             groupCount: groups, dimensions: channels, eps: 1e-6, affine: true, pytorchCompatible: true
         )

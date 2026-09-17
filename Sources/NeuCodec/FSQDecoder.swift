@@ -28,7 +28,7 @@ final class FSQDecoder: Module, UnaryLayer {
     override init() {
         // Compute basis for index decomposition: [1, 4, 16, 64, 256, 1024, 4096, 16384]
         var b: [Int32] = [1]
-        for i in 0..<7 {
+        for i in 0..<(levels.count - 1) {
             b.append(b[i] * Int32(levels[i]))
         }
         self.basis = b

@@ -12,6 +12,9 @@ from pathlib import Path
 from safetensors.numpy import save_file
 import json
 
+# The FFT size of the published NeuCodec head, used when the weights do not say.
+DEFAULT_N_FFT = 1920
+
 
 def weight_norm_to_weight(weight_g: torch.Tensor, weight_v: torch.Tensor) -> torch.Tensor:
     """Convert weight normalization parameters to actual weight matrix.
@@ -130,9 +133,10 @@ def convert_neucodec_to_mlx(
     print(f"\nSaving to {output_path}")
     save_file(renamed_weights, str(output_path))
 
-    # Determine config from weights
+    # Determine config from weights; the head's output carries n_fft + 2 bins, and the published NeuCodec uses 1920.
+    default_n_fft = DEFAULT_N_FFT
     head_out_shape = renamed_weights.get("head.out.weight", np.zeros((0,))).shape
-    n_fft = (head_out_shape[0] - 2) if len(head_out_shape) > 0 else 1920
+    n_fft = (head_out_shape[0] - 2) if len(head_out_shape) > 0 else default_n_fft
 
     config = {
         "hidden_dim": 1024,
